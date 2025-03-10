@@ -421,7 +421,10 @@ def main():
             
             for batch, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/2"):
                 x_0 = batch.to(device)
-                y = labels.to(device).float()
+                y = labels.to(device)
+                y= torch.functional.F.one_hot(y.to(torch.int64), num_classes=2)
+                y = y.to(torch.float32)
+                
                 
                 # Sample random timesteps
                 t = torch.randint(0, timesteps, (x_0.shape[0],), device=device)
