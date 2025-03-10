@@ -82,7 +82,7 @@ class TTS_block(nn.Module):
         # Conditioning with time and one-hot label embeddings
         t = t.to(torch.float32).reshape(-1, 1)
         t_emb = self.embed_t(t).unsqueeze(-1).unsqueeze(-1).expand_as(x)
-
+        
         y_emb = self.embed_y(y_onehot).unsqueeze(-1).unsqueeze(-1).expand_as(x)
 
         x = x + t_emb + y_emb  # Add conditioning
@@ -138,7 +138,7 @@ class TailBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, c_in=1, c_out=1, time_dim=256, device='cpu'):
+    def __init__(self, c_in=1, c_out=1, time_dim=256, num_classes = 2, device='cpu'):
         super(UNet, self).__init__()
         self.device = device
         
@@ -150,40 +150,73 @@ class UNet(nn.Module):
 
         # Encoder (downsampling path)
         # First block
-        self.tts_d1 = TTS_block(in_channels=init_features, out_channels=init_features, use_attention=True)
-        self.tts_d2 = TTS_block(in_channels=init_features, out_channels=init_features, use_attention=True)
+        self.tts_d1 = TTS_block(in_channels=init_features, out_channels=init_features, num_classes=num_classes, use_attention=True)
+        self.tts_d2 = TTS_block(in_channels=init_features, out_channels=init_features, num_classes=num_classes, use_attention=True)
         self.down1 = DownBlock(in_channels=init_features, out_channels=init_features)
         
         # Second block
-        self.tts_d3 = TTS_block(in_channels=init_features, out_channels=init_features*2, use_attention=True, use_shortcut=False)
-        self.tts_d4 = TTS_block(in_channels=init_features*2, out_channels=init_features*2, use_attention=True)
+        self.tts_d3 = TTS_block(in_channels=init_features, out_channels=init_features*2, num_classes=num_classes, use_attention=True, use_shortcut=False)
+        self.tts_d4 = TTS_block(in_channels=init_features*2, out_channels=init_features*2, num_classes=num_classes, use_attention=True)
         self.down2 = DownBlock(in_channels=init_features*2, out_channels=init_features*2)
         
         # Third block
-        self.tts_d5 = TTS_block(in_channels=init_features*2, out_channels=init_features*4, use_attention=True)
-        self.tts_d6 = TTS_block(in_channels=init_features*4, out_channels=init_features*4, use_attention=True)
+        self.tts_d5 = TTS_block(in_channels=init_features*2, out_channels=init_features*4, num_classes=num_classes, use_attention=True)
+        self.tts_d6 = TTS_block(in_channels=init_features*4, out_channels=init_features*4, num_classes=num_classes, use_attention=True)
 
         # Bottleneck
-        self.tts_bottleneck1 = TTS_block(in_channels=init_features*4, out_channels=init_features*4, use_attention=True)
-        self.tts_bottleneck2 = TTS_block(in_channels=init_features*4, out_channels=init_features*4, use_attention=False)
+        self.tts_bottleneck1 = TTS_block(in_channels=init_features*4, out_channels=init_features*4, num_classes=num_classes, use_attention=True)
+        self.tts_bottleneck2 = TTS_block(in_channels=init_features*4, out_channels=init_features*4, num_classes=num_classes, use_attention=False)
 
         # Decoder (upsampling path)
         # First block (deepest)
-        self.tts_u1 = TTS_block(in_channels=init_features*8, out_channels=init_features*4, use_attention=False)
-        self.tts_u2 = TTS_block(in_channels=init_features*8, out_channels=init_features*4, use_attention=False)
-        self.tts_u3 = TTS_block(in_channels=init_features*6, out_channels=init_features*4, use_attention=False)
+        self.tts_u1 = TTS_block(in_channels=init_features*8, out_channels=init_features*4, num_classes=num_classes, use_attention=False)
+        self.tts_u2 = TTS_block(in_channels=init_features*8, out_channels=init_features*4, num_classes=num_classes, use_attention=False)
+        self.tts_u3 = TTS_block(in_channels=init_features*6, out_channels=init_features*4, num_classes=num_classes, use_attention=False)
         self.up1 = UpBlock(in_channels=init_features*4, out_channels=init_features*4)
         
         # Second block
-        self.tts_u4 = TTS_block(in_channels=init_features*6, out_channels=init_features*2, use_attention=False)
-        self.tts_u5 = TTS_block(in_channels=init_features*4, out_channels=init_features*2, use_attention=False)
-        self.tts_u6 = TTS_block(in_channels=init_features*3, out_channels=init_features*2, use_attention=False)
+        self.tts_u4 = TTS_block(in_channels=init_features*6, out_channels=init_features*2, num_classes=num_classes, use_attention=False)
+        self.tts_u5 = TTS_block(in_channels=init_features*4, out_channels=init_features*2, num_classes=num_classes, use_attention=False)
+        self.tts_u6 = TTS_block(in_channels=init_features*3, out_channels=init_features*2, num_classes=num_classes, use_attention=False)
         self.up2 = UpBlock(in_channels=init_features*2, out_channels=init_features*2)
         
         # Third block (shallowest)
-        self.tts_u7 = TTS_block(in_channels=init_features*3, out_channels=init_features, use_attention=False)
-        self.tts_u8 = TTS_block(in_channels=init_features*2, out_channels=init_features, use_attention=False)
-        self.tts_u9 = TTS_block(in_channels=init_features*2, out_channels=init_features, use_attention=False)
+        self.tts_u7 = TTS_block(in_channels=init_features*3, out_channels=init_features, num_classes=num_classes, use_attention=False)
+        self.tts_u8 = TTS_block(in_channels=init_features*2, out_channels=init_features, num_classes=num_classes, use_attention=False)
+        self.tts_u9 = TTS_block(in_channels=init_features*2, out_channels=init_features, num_classes=num_classes, use_attention=False)
+        self.tts_d2 = TTS_block(in_channels=init_features, out_channels=init_features,num_classes=num_classes, use_attention=True)
+        self.down1 = DownBlock(in_channels=init_features, out_channels=init_features)
+        
+        # Second block
+        self.tts_d3 = TTS_block(in_channels=init_features, out_channels=init_features*2, use_attention=True,num_classes=num_classes, use_shortcut=False)
+        self.tts_d4 = TTS_block(in_channels=init_features*2, out_channels=init_features*2,num_classes=num_classes, use_attention=True)
+        self.down2 = DownBlock(in_channels=init_features*2, out_channels=init_features*2)
+        
+        # Third block
+        self.tts_d5 = TTS_block(in_channels=init_features*2, out_channels=init_features*4,num_classes=num_classes, use_attention=True)
+        self.tts_d6 = TTS_block(in_channels=init_features*4, out_channels=init_features*4,num_classes=num_classes, use_attention=True)
+
+        # Bottleneck
+        self.tts_bottleneck1 = TTS_block(in_channels=init_features*4, out_channels=init_features*4,num_classes=num_classes, use_attention=True)
+        self.tts_bottleneck2 = TTS_block(in_channels=init_features*4, out_channels=init_features*4,num_classes=num_classes, use_attention=False)
+
+        # Decoder (upsampling path)
+        # First block (deepest)
+        self.tts_u1 = TTS_block(in_channels=init_features*8, out_channels=init_features*4, num_classes=num_classes,use_attention=False)
+        self.tts_u2 = TTS_block(in_channels=init_features*8, out_channels=init_features*4, num_classes=num_classes, use_attention=False)
+        self.tts_u3 = TTS_block(in_channels=init_features*6, out_channels=init_features*4, num_classes=num_classes, use_attention=False)
+        self.up1 = UpBlock(in_channels=init_features*4, out_channels=init_features*4)
+        
+        # Second block
+        self.tts_u4 = TTS_block(in_channels=init_features*6, out_channels=init_features*2, num_classes=num_classes, use_attention=False)
+        self.tts_u5 = TTS_block(in_channels=init_features*4, out_channels=init_features*2,num_classes=num_classes, use_attention=False)
+        self.tts_u6 = TTS_block(in_channels=init_features*3, out_channels=init_features*2,num_classes=num_classes, use_attention=False)
+        self.up2 = UpBlock(in_channels=init_features*2, out_channels=init_features*2)
+        
+        # Third block (shallowest)
+        self.tts_u7 = TTS_block(in_channels=init_features*3, out_channels=init_features, num_classes=num_classes, use_attention=False)
+        self.tts_u8 = TTS_block(in_channels=init_features*2, out_channels=init_features, num_classes=num_classes, use_attention=False)
+        self.tts_u9 = TTS_block(in_channels=init_features*2, out_channels=init_features, num_classes=num_classes, use_attention=False)
 
         # Output layer
         self.tail = TailBlock(in_channels=init_features, out_channels=c_out)

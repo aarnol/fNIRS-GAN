@@ -251,7 +251,10 @@ def train_and_sample(
         for batch, labels in progress_bar:
             x_0 = batch.to(diffusion_model.device)
             y = labels.to(diffusion_model.device).float() if labels is not None else None
-            
+            if y is not None:
+                y= torch.functional.F.one_hot(y.to(torch.int64), num_classes=2)
+                y = y.to(torch.float32)
+
             # Sample random timesteps
             t = torch.randint(
                 0, diffusion_model.timesteps, (x_0.shape[0],), 
@@ -285,14 +288,11 @@ def train_and_sample(
             
             with torch.no_grad():
                 for class_idx in sample_classes:
-                    # Create class label for this specific class
-                    if isinstance(class_idx, int):
-                        # For integer class indices (single class)
-                        y = torch.zeros(num_samples, dtype=torch.float32, device=diffusion_model.device)
-                        y[:] = class_idx
-                    else:
-                        # For no one-hot encodings
-                        y = torch.full((num_samples,), class_idx, dtype=torch.float32, device=diffusion_model.device)
+                    #
+                    # For one-hot encodings
+                    y = torch.zeros((num_samples, len(sample_classes)), device=diffusion_model.device)
+                    y[:, class_idx] = 1.0
+                    print(y.shape)
                     
                     # Generate samples
                     samples, _ = diffusion_model.p_sample_loop(
@@ -341,14 +341,10 @@ def generate_samples(
         print(f"Generating {num_samples_per_class} samples for class {class_idx}...")
         
         # Create class label for this specific class
-        if isinstance(class_idx, int):
-            # For integer class indices (single class)
-            y = torch.zeros(num_samples_per_class, dtype=torch.float32, device=diffusion_model.device)
-            y[:] = class_idx
-        else:
-            # For one-hot encodings
-            y = torch.zeros((num_samples_per_class, len(sample_classes)), device=diffusion_model.device)
-            y[:, class_idx] = 1.0
+        
+        # For one-hot encodings
+        y = torch.zeros((num_samples_per_class, len(sample_classes)), device=diffusion_model.device)
+        y[:, class_idx] = 1.0
         
         # Generate samples
         with torch.no_grad():
@@ -382,8 +378,8 @@ def generate_samples(
 
 def main():
     # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
+    torch.manual_seed(99)
+    np.random.seed(99)
     
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -406,7 +402,7 @@ def main():
     diffusion_model = DiffusionModel(timesteps=timesteps, beta_schedule='linear', device=device)
     
     # Create UNet model
-    unet_model = UNet(c_in=4, c_out=4, time_dim=64, device=device).to(device)
+    unet_model = UNet(c_in=4, c_out=4, time_dim=64, num_classes=len(sample_classes), device=device).to(device)
     
     # Check your UNet model to determine the expected format for label conditioning
     # Based on the error, let's first train without sampling to avoid issues
@@ -415,28 +411,28 @@ def main():
     # First train for a few epochs to understand model behavior
     try:
         print("Starting training...")
-        for epoch in range(2):  # Just 2 epochs to test
-            total_loss = 0.0
-            num_batches = 0
+        # for epoch in range(2):  # Just 2 epochs to test
+        #     total_loss = 0.0
+        #     num_batches = 0
             
-            for batch, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/2"):
-                x_0 = batch.to(device)
-                y = labels.to(device)
-                y= torch.functional.F.one_hot(y.to(torch.int64), num_classes=2)
-                y = y.to(torch.float32)
+        #     for batch, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/2"):
+        #         x_0 = batch.to(device)
+        #         y = labels.to(device)
+        #         y= torch.functional.F.one_hot(y.to(torch.int64), num_classes=2)
+        #         y = y.to(torch.float32)
+
                 
+        #         # Sample random timesteps
+        #         t = torch.randint(0, timesteps, (x_0.shape[0],), device=device)
                 
-                # Sample random timesteps
-                t = torch.randint(0, timesteps, (x_0.shape[0],), device=device)
+        #         # Train step
+        #         loss = diffusion_model.train_step(unet_model, optim.Adam(unet_model.parameters(), lr=1e-4), x_0, t, y)
                 
-                # Train step
-                loss = diffusion_model.train_step(unet_model, optim.Adam(unet_model.parameters(), lr=1e-4), x_0, t, y)
-                
-                total_loss += loss
-                num_batches += 1
+        #         total_loss += loss
+        #         num_batches += 1
             
-            avg_loss = total_loss / num_batches
-            print(f"Epoch [{epoch+1}/2], Avg Loss: {avg_loss:.4f}")
+        #     avg_loss = total_loss / num_batches
+        #     print(f"Epoch [{epoch+1}/2], Avg Loss: {avg_loss:.4f}")
         
         print("Initial training successful. Now proceeding with full training...")
         
@@ -444,6 +440,9 @@ def main():
         sample_x, sample_y = next(iter(train_loader))
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device).float()
+        sample_y= torch.functional.F.one_hot(sample_y.to(torch.int64), num_classes=2)
+        sample_y = sample_y.to(torch.float32)
+
         
         t_sample = torch.zeros(sample_x.shape[0], device=device, dtype=torch.int64)
         
@@ -500,15 +499,10 @@ def main():
             print(inspect.signature(unet_model.forward))
             
         # Print basic model structure
-        print("\nBasic UNet structure:")
-        print(unet_model)
+        # print("\nBasic UNet structure:")
+        # print(unet_model)
         
-        # Suggest modifications
-        print("\nBased on error, the likely issue is a shape mismatch in the UNet's handling of labels.")
-        print("Recommended fixes:")
-        print("1. Check if the UNet expects integer labels or one-hot encoded labels")
-        print("2. Ensure batch size consistency between x_t and labels")
-        print("3. Verify that the label embedding in UNet matches the number of classes")
+        
 
 
 if __name__ == "__main__":
