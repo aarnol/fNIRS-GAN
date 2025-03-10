@@ -1,0 +1,7 @@
+data/
+ONR_data/
+checkpoints/
+checkpoints_pre/
+diffusion_results/
+*.pth
+*.pyc
