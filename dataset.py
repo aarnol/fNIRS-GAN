@@ -100,8 +100,7 @@ class ONRData(Dataset):
             path = os.path.join("ONR_data","data", "data_csvs", subject+".csv")
             fnir = pd.read_csv(path, sep=",", header=0)
             fnir = fnir.drop(columns=['Time'])
-            # standardize the data by channel
-            fnir = (fnir - fnir.min(axis=0)) / (fnir.max(axis=0) - fnir.min(axis=0))
+            
             
 
             data[subject] = fnir
@@ -188,6 +187,14 @@ class ONRData(Dataset):
         pad_height = (4 - sample.shape[0] % 4) % 4 
         pad_width = (4 - sample.shape[1] % 4) % 4 
         sample = torch.permute(sample, (2, 0, 1))
+        #normalize across the channel dimension
+        # Compute mean and std along the 0th dimension (D)
+        mean = sample.mean(dim=0, keepdim=True)
+        std = sample.std(dim=0, keepdim=True)
+
+        # Normalize
+        sample = (sample - mean) / (std + 1e-8)  # Adding epsilon for numerical stability
+
         sample = torch.nn.functional.pad(sample, (0, pad_width, 0, pad_height), mode='constant', value=0)
         
        

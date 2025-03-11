@@ -388,7 +388,7 @@ def main():
     # Define parameters
     timesteps = 1000  # Reduced from 2000 for faster training
     batch_size = 64
-    num_epochs = 120
+    num_epochs = 240
     sample_shape = (1, 4, 12, 8)  # From the original code
     sample_classes = [0, 1]  # Two classes from the original code
     
@@ -461,7 +461,7 @@ def main():
             lr=1e-4,
             save_dir='./diffusion_results',
             sample_every=5,
-            save_model_every=10,
+            save_model_every=20,
             num_samples=5,
             sample_shape=sample_shape,
             sample_classes=sample_classes
